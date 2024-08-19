@@ -1,9 +1,10 @@
 function get_stadnamn_data(url::String)
-    try
-        response = HTTP.get(url)
+    response = try
+         HTTP.get(url)
     catch e
         # Catch HTTP errors like 404, 500, etc.
-        printstyled("HTTP request failed: ", color = :green)
+        printstyled("HTTP request failed \n", color = :green)
+        printstyled("    Request url: $url", "\n", color = :green)
         @show e  # Display the full error object for debugging
         return JSON3.Object()  # Return an empty JSON object to signify failure
     end
@@ -21,14 +22,15 @@ function get_stadnamn_data(url::String)
         return JSON3.Object()
     end
 end
-get_stadnamn_data(params::Dict) = get_stadnamn_data(get_stadnamn_url(params))
 
-function construct_url(base_url::String, endpoint::String, params::Dict{String, String})
-    query_string = "?" * join([k * "=" * v for (k, v) in params], "&")
-    return base_url * endpoint * query_string
+function construct_url(base_url::String, endpoint::String, params::Dict)
+    query_string = "?" * join([string(k) * "=" * string(v) for (k, v) in params], "&")
+    base_url * endpoint * query_string
 end
-function get_stadnamn_url(params::Dict{String, String})
-    base_url = "https://api.kartverket.no/stedsnavn/v1"
-    endpoint = "/stedsnavn"
-    return construct_url(base_url, endpoint, params)
+function get_stadnamn_url(endpoint, params::Dict; base_url = "https://api.kartverket.no/stedsnavn/v1")
+    startswith(endpoint, "/") || throw(ArgumentError("endpoint must start with '/'. Got: $endpoint"))
+    endswith(endpoint, "/") && throw(ArgumentError("endpoint can't end with '/'. Got: $endpoint"))
+    construct_url(base_url, endpoint, params)
 end
+
+get_stadnamn_data(endpoint, params::Dict) = get_stadnamn_data(get_stadnamn_url(endpoint, params))

@@ -1,0 +1,3 @@
+# Some exploring
+using Stadnamn
+
