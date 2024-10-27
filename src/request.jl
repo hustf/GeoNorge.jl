@@ -1,3 +1,39 @@
+# Onlne-only API functions here
+"""
+    get_stadnamn_data(url::String)
+    get_stadnamn_data(endpoint, params::Dict)
+    ---> JSONO
+
+# Example
+
+```
+julia> endpoint = "/punkt"
+"/punkt"
+
+julia> sutm = "26053,6910869" # UTM easting, northing
+"26053,6910869"
+
+julia> params = Dict(:koordsys => 25833,                                                                                                                                                                                                                                                                                                 
+           :utkoordsys => 25833,                                                                                                                                                                                                                                                                                                         
+           :nord => split(sutm, ',')[2],                                                                                                                                                                                                                                                                                                 
+           :ost => split(sutm, ',')[1],                                                                                                                                                                                                                                                                                                  
+           :radius => 150,                                                                                                                                                                                                                                                                                                               
+           :filtrer => "navn.stedsnavn,navn.meterFraPunkt")
+Dict{Symbol, Any} with 6 entries:
+  :ost        => "26053"
+  :koordsys   => 25833
+  :utkoordsys => 25833
+  :radius     => 150
+  :filtrer    => "navn.stedsnavn,navn.meterFraPunkt"
+  :nord       => "6910869"
+
+julia> get_stadnamn_data(endpoint, params)
+JSON3.Object{Vector{UInt8}, Vector{UInt64}} with 1 entry:
+  :navn => Object[{…
+```
+
+"""
+get_stadnamn_data(endpoint, params::Dict) = get_stadnamn_data(get_stadnamn_url(endpoint, params))
 function get_stadnamn_data(url::String)
     response = try
          HTTP.get(url)
@@ -33,4 +69,3 @@ function get_stadnamn_url(endpoint, params::Dict; base_url = "https://api.kartve
     construct_url(base_url, endpoint, params)
 end
 
-get_stadnamn_data(endpoint, params::Dict) = get_stadnamn_data(get_stadnamn_url(endpoint, params))
