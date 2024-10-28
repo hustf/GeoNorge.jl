@@ -1,71 +1,96 @@
 # Stadnamn.jl
-Minimal interface to the name register API https://api.kartverket.no/stedsnavn/v1
-
+Interface to the name register API https://api.kartverket.no/stedsnavn/v1 with local override.
 
 # What does it do?
 
-- High level function selects one name per position from a local and online data.
+- High level function selects one name per position from `Stadnamn.csv` and online data.
 - Low level functions return a JSON3 Object, which will be empty if an error occured. Errors will print to stdout.
-
 
 # Functions
 
 ## `point_names`
 
-    point_names(vsutm; koordsys = 25833, radius = 150) -> Vector{String}
+  point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
+      accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø",
+      "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg",
+      "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
+  ---> Vector{String}
 
-Fetches names for each coordinate in `vsutm` within the specified `radius`, using data from two sources:
-a local CSV file and an online API. Returns a list with names or empty strings if no name is found.
+  Fetches a string name or empty string for each coordinate in vsutm within the specified radius, using data from:
 
-# Arguments
-- `vsutm`: List of coordinates (positions) to search for, each given as a string in the format `"3232,343223"`.
-- `koordsys`: Coordinate system identifier, where `25833` corresponds to UTM33N.
-- `radius`: A distance threshold within which a name must fall to be considered relevant.
-- 'accept': Acceptable name object types. To find possible 'accept' values: `get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}())` 
+    •  Primarily file homedir()/Stadnamn.csv.
 
-# Data Sources and Priority
-- **Local Source (CSV File)**:
-  - Primary source, preferred over the API.
-  - The closest name within the radius for each input coordinate is returned.
-  - **Conflict Handling**:
-    - If two names are equally close, raises an error with feedback.
-    - If two names occupy the same exact position, raises an error with feedback.
+    •  Secondary online database https://api.kartverket.no/stedsnavn/v1.
 
-- **API Source (Online Database)**:
-  - Secondary source, used only if no unique name is found within the radius from the local source.
-  - **Filtering Rules**:
-    - Returns only point names, excluding regional and path names.
-    - Avoids generic names if a unique name is available within the radius.
+  Arguments
+  ≡≡≡≡≡≡≡≡≡
 
+    •  vsutm: List of coordinates (positions) to search for, each given as a string in the format "3232,343223".
 
-# Behavior with no match
-If no name is found within the radius, an empty string is returned for that coordinate.
+    •  koordsys: Coordinate system identifier, where 25833 corresponds to UTM33N.
 
-# Example
-Given a 150-meter radius and three input positions from Online Database:
-1. **Input Position 1**:
-   - Closest names within 150m are "Storebakken" at 120m, "Marafallet" at 130m and a generic "Gårdsplass" at 80m.
-2. **Input Position 2**:
-   - Closest name within 150m is the generic "Gårdsplass" at 130m.
-3. **Input Position 3**:
-   - Closest name within 150m is "Lillehaugen" at 90m.
+    •  radius: A distance threshold within which a name must fall to be considered relevant.
 
-**Result**:
-- Position 1 returns "Storebakken" (unique name preferred over generic "Gårdsplass" and farther "Marafallet").
-- Position 2 returns "Gårdsplass" (generic name chosen as no unique name is available).
-- Position 3 returns "Lillehaugen" (unique name within the radius).
+    •  'accept': Acceptable name object types from '/punkt'. To find schema 'accept' values: get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}()). The schema is incomplete.
 
-*Note*: The choice of name for Position 1 and Position 2 is not affected by the availability of "Storebakken" or any other name for Position 3. Each position is evaluated independently based on its closest name within the radius.
+    •  'locmarker': Prefix for names taken from Stadnamn.csv. '' means no prefix.
 
-# Errors
-- Errors are raised if:
-  - Two names in the local source are equidistant from an input position.
-  - Two names in the local source occupy the same exact position.
+  Data Sources and Priority
+  ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
+    •  Local Source (CSV File):
+       • Primary source, preferred over the API.
+       • The closest name within the radius is returned.
+       • Conflict Handling:
+       • If two names are equally close, raises an error with feedback.
+
+    •  API Source (Online Database):
+       • Secondary source, used only if no unique name is found within the radius from the local source.
+       • Filtering Rules:
+       • Obeys 'radius' from the inpu location.
+       • Returns point names according to argument accept. Note that the database has types not in its own schema.
+       • Unique (considering the online request) candidates are elected first.
+       • Prefers the candidate closest to the request position.
+
+  Behavior with no match
+  ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
+
+  If no name is found within the radius, an empty string is returned for that coordinate.
+
+  Example
+  ≡≡≡≡≡≡≡
+
+  Given a 150-meter radius and three input positions from Online Database:
+
+    1. Input Position 1:
+       • Closest names within 150m are "Storebakken" at 120m, "Marafallet" at 130m and a generic "Gårdsplass" at 80m.
+
+    2. Input Position 2:
+       • Closest name within 150m is the generic "Gårdsplass" at 130m.
+
+    3. Input Position 3:
+       • Closest name within 150m is "Lillehaugen" at 90m.
+
+  Result:
+
+    •  Position 1 returns "Storebakken" (unique name preferred over generic "Gårdsplass" and farther "Marafallet").
+
+    •  Position 2 returns "Gårdsplass" (generic name chosen as no unique name is available).
+
+    •  Position 3 returns "Lillehaugen" (unique name within the radius).
+
+  Note: The choice of name for Position 1 and Position 2 is not affected by the availability of "Storebakken" or any other name for Position 3. Each position is evaluated independently based on its closest name within the radius.
+
+  Errors
+  ≡≡≡≡≡≡
+
+    •  Errors are raised if:
+       • Two positions in Stadnamn.csv are equal.
+       • Two positions in Stadnamn.csv are equidistant from an input position.
 
 ## `get_stadnamn_data`
 
-Based on info retrieved with 'explore', we'll use that endpoint:
+Based on info retrieved with 'explore', we can use the endpoint more directly:
 
 ```
 julia> endpoint = "/punkt";

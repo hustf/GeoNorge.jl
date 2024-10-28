@@ -3,31 +3,37 @@
 # 
 
 """
-    point_names(vsutm; koordsys = 25833, radius = 150) -> Vector{String}
+    point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
+        accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø", 
+        "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg", 
+        "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
+    ---> Vector{String}
 
-Fetches names for each coordinate in `vsutm` within the specified `radius`, using data from two sources:
-a local CSV file and an online API. Returns a list with names or empty strings if no name is found.
+Fetches a string name or empty string for each coordinate in `vsutm` within the specified `radius`, using data from:
+- Primarily file homedir()/$LOCAL_FNAM. 
+- Secondary online database $BASE_URL.
 
 # Arguments
 - `vsutm`: List of coordinates (positions) to search for, each given as a string in the format `"3232,343223"`.
 - `koordsys`: Coordinate system identifier, where `25833` corresponds to UTM33N.
 - `radius`: A distance threshold within which a name must fall to be considered relevant.
-- 'accept': Acceptable name object types. To find possible 'accept' values: `get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}())` 
+- 'accept': Acceptable name object types from '/punkt'. To find schema 'accept' values: `get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}())`. The schema is incomplete.
+- 'locmarker': Prefix for names taken from $LOCAL_FNAM. '' means no prefix.
 
 # Data Sources and Priority
 - **Local Source (CSV File)**:
   - Primary source, preferred over the API.
-  - The closest name within the radius for each input coordinate is returned.
+  - The closest name within the radius is returned.
   - **Conflict Handling**:
     - If two names are equally close, raises an error with feedback.
-    - If two names occupy the same exact position, raises an error with feedback.
 
 - **API Source (Online Database)**:
   - Secondary source, used only if no unique name is found within the radius from the local source.
   - **Filtering Rules**:
-    - Returns only point names, excluding regional and path names.
-    - Avoids generic names if a unique name is available within the radius.
-
+    - Obeys 'radius' from the inpu location.
+    - Returns point names according to argument `accept`. Note that the database has types not in its own schema.
+    - Unique (considering the online request) candidates are elected first.
+    - Prefers the candidate closest to the request position.
 
 # Behavior with no match
 If no name is found within the radius, an empty string is returned for that coordinate.
@@ -50,19 +56,94 @@ Given a 150-meter radius and three input positions from Online Database:
 
 # Errors
 - Errors are raised if:
-  - Two names in the local source are equidistant from an input position.
-  - Two names in the local source occupy the same exact position.
+  - Two positions in $LOCAL_FNAM are equal.
+  - Two positions in $LOCAL_FNAM are equidistant from an input position.
+  - A name in $LOCAL_FNAM contains ','.
 """
-function point_names(vsutm; koordsys = 25833, radius = 150,
+function point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
     accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø", 
         "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg", 
         "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
     # If a point name is defined in local data, we don't need to retrieve anything online.
-    # The local part is not yet implemented.
-    online_points_names(vsutm::Vector{String}; koordsys , radius, accept)
+    lpn = local_points_names(vsutm::Vector{String}; radius, locmarker)
+    ind_nf = findall(isempty, lpn)
+    opn = online_points_names(vsutm[ind_nf]; koordsys , radius, accept)
+    map(enumerate(lpn)) do (i, lnam)
+        lnam == ""
+    end
+    # Mix the two name lists, using opn where lpn is lacking
+    online_i = 0
+    map(lpn) do lnam
+        if lnam == ""
+            online_i += 1
+            opn[online_i]
+        else
+            lnam 
+        end
+    end
 end
 
-
+function local_points_names(vsutm; radius = 150, locmarker = '·')
+    # Assign output, the selected name for each position
+    elected_names = similar(vsutm)
+    # Read local data
+    ffnam = joinpath(homedir(), LOCAL_FNAM)
+    if ! isfile(ffnam)
+        @warn "Could not find any local name and positions file, $ffnam"
+        fill!(elected_names, "")
+        return elected_names
+    end
+    data = readdlm(ffnam, '\t') # No header
+    @assert size(data, 2) == 2
+    # Candidate names
+    vnam = data[:, 1]
+    if any(contains.(vnam, ','))
+        throw(ArgumentError("Illegal character ',' found, check input $ffnam"))
+    end
+    # Candidate positions
+    vpos = map(data[:, 2]) do spos
+        Tuple(tryparse.(Int64, split(spos)))
+    end
+    # Check for duplicate positions defined
+    if length(unique(vpos)) < length(vpos)
+        # Find the non-uniqe positions
+        countpos = Dict{eltype(vpos), Int64}()
+        foreach(pos -> push!(countpos, pos => get(countpos, pos, 0) + 1), vpos)
+        non_unique = [k for (k, count) in countpos if count > 1]
+        msg = "Duplicate positions detected, check input $ffnam: "
+        println(msg)
+        println.(map(pos -> "$(pos[1]) $(pos[2])",non_unique))
+        throw(ArgumentError(msg))
+    end
+    # Euclidean distance point to point, up to max radius
+    fdist = (easting, northing, pos) -> hypot(pos[1] - easting, pos[2] - northing)
+    # Find the minimum distance indices (there should be only one, but check)
+    fclosest_index = (easting, northing) -> let vpos = vpos, vnam = vnam, radius = radius
+        mindist, minind = findmin(pos -> fdist(easting, northing, pos), vpos)
+        # Return if none found close enough
+        mindist > radius && return 0
+        # Find all indices at this mininum distance
+        minima_indices = findall(pos-> fdist(easting, northing, pos) == mindist, vpos)
+        # Warn about multiple closest points
+        if length(minima_indices) > 1
+            msg = "Could not determine one closest position and name to ($easting $northing)\n"
+            for i in minima_indices
+                msg *= "\t $(vpos[i])   $(vpos[i]) \n"
+            end
+            throw(ErrorException(msg))
+        end
+        minind
+    end
+    closest_indices = map(vsutm) do sutm
+        easting = tryparse(Int, strip(split(sutm, ',')[1]))
+        northing = tryparse(Int, strip(split(sutm, ',')[2]))
+        fclosest_index(easting, northing)
+    end
+    # Return the corresponding names (or empty string for index 0)
+    map(closest_indices) do i
+        i == 0 ? "" : locmarker * vnam[i]
+    end
+end
 
 function online_points_names(vsutm::Vector{String}; koordsys = 25833, radius = 150,
     accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø", 

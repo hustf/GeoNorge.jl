@@ -63,7 +63,7 @@ function construct_url(base_url::String, endpoint::String, params::Dict)
     query_string = "?" * join([string(k) * "=" * string(v) for (k, v) in params], "&")
     base_url * endpoint * query_string
 end
-function get_stadnamn_url(endpoint, params::Dict; base_url = "https://api.kartverket.no/stedsnavn/v1")
+function get_stadnamn_url(endpoint, params::Dict; base_url = BASE_URL)
     startswith(endpoint, "/") || throw(ArgumentError("endpoint must start with '/'. Got: $endpoint"))
     endswith(endpoint, "/") && throw(ArgumentError("endpoint can't end with '/'. Got: $endpoint"))
     construct_url(base_url, endpoint, params)
