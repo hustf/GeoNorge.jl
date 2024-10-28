@@ -21,6 +21,8 @@ vnams =  get.(o.navn[1].stedsnavn, "skrivemåte")
 vsutm = ["47529,6911394", "47965,6911108"]
 @test length(Stadnamn.online_points_nested_objects(vsutm)) == 2
 @test Stadnamn.online_points_names(vsutm) == ["", "Reiteåsane"]
+@test point_names(vsutm) == ["", "Reiteåsane"]
+
 
 vsutm = ["47965,6911108", # Reiteåsane
          "43824,6928853", # Sandhornet, close, no alternative
@@ -28,6 +30,7 @@ vsutm = ["47965,6911108", # Reiteåsane
        ]
 
 @test Stadnamn.online_points_names(vsutm) == ["Reiteåsane", "Sandhornet", "Sandhornet"]
+@test point_names(vsutm) == ["Reiteåsane", "·Sandhornet", "·Sandhornet"]
 
 vsutm = ["47965,6911108", # Reiteåsane
          "43824,6928853", # Sandhornet, close, no alternative
@@ -38,6 +41,7 @@ vsutm = ["47965,6911108", # Reiteåsane
 @test length(Stadnamn.online_points_nested_objects(vsutm)[4][1].stedsnavn) == 2
 
 @test Stadnamn.online_points_names(vsutm) == ["Reiteåsane", "Sandhornet", "Sandhornet", "Blåfjellet"]
+@test point_names(vsutm) == ["Reiteåsane", "·Sandhornet", "·Sandhornet", "·Sandhornet (Blåfjellet)"]
 
 vsutm = ["47965,6911108", # Reiteåsane
          "43824,6928853", # Sandhornet, close, no alternative
@@ -56,8 +60,6 @@ vsutm = ["40400,6917295", # Blåfjellet, no alt.
 vsutm = ["60030,6935104", # Saudehornet
          "40697,6931960"] # Sauehornet, Saudehornet
 @test Stadnamn.online_points_names(vsutm) == ["Saudehornet", "Sauehornet"]
+@test point_names(vsutm) == ["·Trandalhatten (Saudehornet)", "·Saudehornet"]
 # The preference for unique names will pick those, even when further away, when the radius is large.
 @test Stadnamn.online_points_names(vsutm; radius = 4500)  == ["Staven", "Saudehaugen"]
-
-
-vsutm = ["23405,6895630"]
