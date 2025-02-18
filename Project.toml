@@ -1,7 +1,7 @@
 name = "Stadnamn"
 uuid = "0a5bb257-8fa1-4030-bf16-d79c742dcb15"
 authors = ["hustf <hustf@users.noreply.github.com> and contributors"]
-version = "0.1.3"
+version = "0.2.0"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"

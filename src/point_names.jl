@@ -3,7 +3,7 @@
 # 
 
 """
-    point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
+    point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150, online = true,
         accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø", 
         "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg", 
         "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
@@ -17,6 +17,7 @@ Fetches a string name or empty string for each coordinate in `vsutm` within the 
 - `vsutm`: List of coordinates (positions) to search for, each given as a string in the format `"3232,343223"`.
 - `koordsys`: Coordinate system identifier, where `25833` corresponds to UTM33N.
 - `radius`: A distance threshold within which a name must fall to be considered relevant.
+- `online`: If false, avoids requesting names from online API.
 - 'accept': Acceptable name object types from '/punkt'. To find schema 'accept' values: `get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}())`. The schema is incomplete.
 - 'locmarker': Prefix for names taken from $LOCAL_FNAM. '' means no prefix.
 
@@ -28,7 +29,7 @@ Fetches a string name or empty string for each coordinate in `vsutm` within the 
     - If two names are equally close, raises an error with feedback.
 
 - **API Source (Online Database)**:
-  - Secondary source, used only if no unique name is found within the radius from the local source.
+  - Secondary source, used only if no unique name is found within the radius from the local source, and `online` = true.
   - **Filtering Rules**:
     - Obeys 'radius' from the inpu location.
     - Returns point names according to argument `accept`. Note that the database has types not in its own schema.
@@ -60,14 +61,18 @@ Given a 150-meter radius and three input positions from Online Database:
   - Two positions in $LOCAL_FNAM are equidistant from an input position.
   - A name in $LOCAL_FNAM contains ','.
 """
-function point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
+function point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150, online = true,
     accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø", 
         "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg", 
         "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
     # If a point name is defined in local data, we don't need to retrieve anything online.
     lpn = local_points_names(vsutm::Vector{String}; radius, locmarker)
     ind_nf = findall(isempty, lpn)
-    opn = online_points_names(vsutm[ind_nf]; koordsys , radius, accept)
+    if online
+        opn = online_points_names(vsutm[ind_nf]; koordsys , radius, accept)
+    else
+        opn = ["" for i in ind_nf]
+    end
     map(enumerate(lpn)) do (i, lnam)
         lnam == ""
     end
@@ -93,16 +98,20 @@ function local_points_names(vsutm; radius = 150, locmarker = '·')
         fill!(elected_names, "")
         return elected_names
     end
-    data = readdlm(ffnam, '\t') # No header
+    data = readdlm(ffnam, '\t') # No header, tab separated
     @assert size(data, 2) == 2
     # Candidate names
-    vnam = data[:, 1]
+    vnam = strip.(data[:, 1])
     if any(contains.(vnam, ','))
         throw(ArgumentError("Illegal character ',' found, check input $ffnam"))
     end
     # Candidate positions
-    vpos = map(data[:, 2]) do spos
-        Tuple(tryparse.(Int64, split(spos)))
+    vpos = map(enumerate(data[:, 2])) do (line, spos)
+        t = Tuple(tryparse.(Int64, split(spos)))
+        if isempty(t)
+            throw("Could not interprete position in $ffnam line no. $line: \"$spos\"")
+        end
+        t
     end
     # Check for duplicate positions defined
     if length(unique(vpos)) < length(vpos)
@@ -112,6 +121,7 @@ function local_points_names(vsutm; radius = 150, locmarker = '·')
         non_unique = [k for (k, count) in countpos if count > 1]
         msg = "Duplicate positions detected, check input $ffnam: "
         println(msg)
+        @show non_unique vpos
         println.(map(pos -> "$(pos[1]) $(pos[2])",non_unique))
         throw(ArgumentError(msg))
     end

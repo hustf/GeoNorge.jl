@@ -10,7 +10,7 @@ Interface to the name register API https://api.kartverket.no/stedsnavn/v1 with l
 
 ## `point_names`
 
-  point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150,
+  point_names(vsutm; locmarker = '·', koordsys = 25833, radius = 150, online = true,
       accept = ["Fjell", "Fjell i dagen", "Fjellkant", "Fjellområde", "Fjellside", "Fjelltopp i sjø",
       "Annen terrengdetalj", "Berg", "Egg", "Haug", "Hei", "Høyde", "Rygg",
       "Stein", "Topp", "Utmark", "Varde", "Vidde", "Ås"])
@@ -31,6 +31,8 @@ Interface to the name register API https://api.kartverket.no/stedsnavn/v1 with l
 
     •  radius: A distance threshold within which a name must fall to be considered relevant.
 
+    • online: If false, avoids requesting names from online API.
+
     •  'accept': Acceptable name object types from '/punkt'. To find schema 'accept' values: get_stadnamn_data("/navneobjekttyper", Dict{Symbol, Any}()). The schema is incomplete.
 
     •  'locmarker': Prefix for names taken from Stadnamn.csv. '' means no prefix.
@@ -45,7 +47,7 @@ Interface to the name register API https://api.kartverket.no/stedsnavn/v1 with l
        • If two names are equally close, raises an error with feedback.
 
     •  API Source (Online Database):
-       • Secondary source, used only if no unique name is found within the radius from the local source.
+       • Secondary source, used only if no unique name is found within the radius from the local source, and `online` = true.
        • Filtering Rules:
        • Obeys 'radius' from the inpu location.
        • Returns point names according to argument accept. Note that the database has types not in its own schema.

@@ -42,7 +42,7 @@ vsutm = ["47965,6911108", # Reiteåsane
 
 @test Stadnamn.online_points_names(vsutm) == ["Reiteåsane", "Sandhornet", "Sandhornet", "Blåfjellet"]
 @test point_names(vsutm) == ["Reiteåsane", "·Sandhornet", "·Sandhornet", "·Sandhornet (Blåfjellet)"]
-
+@test point_names(vsutm; online = false) == ["", "·Sandhornet", "·Sandhornet", "·Sandhornet (Blåfjellet)"]
 vsutm = ["47965,6911108", # Reiteåsane
          "43824,6928853", # Sandhornet, close, no alternative
          "48180,6928237",  # Another 'Sandhornet', a bit further from the name, no alternative
